@@ -1,0 +1,19 @@
+Crear cuenta para Office 365 - Lync
+https://portal.microsoftonline.com/Signup/MainSignUp15.aspx?&OfferId=55A1B852-7BB9-4d78-AE46-0D1B213D1725&dl=LITEPACK_P2&Country=US&culture=en-us&WT%2Eintid1=ODC_ENUS_FX103789571_XT103977427&WT%2Eintid2=ODC_ENUS_FX103037625_XT103040270&ali=1
+
+instalar desktop aplications
+https://portal.microsoftonline.com/OLS/MySoftware.aspx
+
+Organization
+Probando Lync
+
+admin page
+https://portal.microsoftonline.com/Admin/Default.aspx
+
+Cuentas Lync
+juanperez@GlobantLyncTest.onmicrosoft.com
+cachocastania@GlobantLyncTest.onmicrosoft.com
+pepeparada@GlobantLyncTest.onmicrosoft.com
+
+email alternativo
+testlync1@outlook.com
