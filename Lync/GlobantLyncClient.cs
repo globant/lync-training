@@ -21,19 +21,12 @@ namespace Lync
         private static GlobantLyncClient _Instance;
         public static GlobantLyncClient GetInstance()
         {
-            if (_Instance != null)
-                return _Instance;
-
-            _Instance = new GlobantLyncClient();
-
-            try
+            if (_Instance == null)
             {
-                _Instance._Client = LyncClient.GetClient();
-            }
-            catch (Exception e)
-            {
-                _Instance = null;
-                NotificationHelper.Notify(Notifier, "Lync Client", "Unable to create Lync instance: " + e.Message, Severity.Error);
+                _Instance = new GlobantLyncClient();
+
+                if (!_Instance.CreateInstance())
+                    _Instance = null;
             }
 
             return _Instance;
@@ -43,6 +36,32 @@ namespace Lync
         public event EventHandler<UserAddedEventArgs> UserAdded;
         public event EventHandler SignIn;
         public event EventHandler SignOut;
+
+        private bool CreateInstance()
+        {
+            try
+            {
+                _Client = LyncClient.GetClient();
+                _Client.ConversationManager.ConversationAdded += new EventHandler<ConversationManagerEventArgs>(ConversationManager_ConversationAdded);
+            }
+            catch (Exception e)
+            {
+                NotificationHelper.Notify(Notifier, "Lync Client", "Unable to create Lync instance: " + e.Message, Severity.Error);
+                return false;
+            }
+
+            return true;
+        }
+
+        void ConversationManager_ConversationAdded(object sender, ConversationManagerEventArgs e)
+        {
+            e.Conversation.ContextDataReceived += new EventHandler<ContextEventArgs>(Conversation_ContextDataReceived);
+        }
+
+        void Conversation_ContextDataReceived(object sender, ContextEventArgs e)
+        {
+            string s = e.ContextData;
+        }
 
         private bool IsClientAvailable()
         {
@@ -60,7 +79,20 @@ namespace Lync
             if (!IsClientAvailable()) return;
 
             if (_Client.InSuppressedMode)
-                _Client.BeginInitialize(InitializeCallback, new string[] { userUri, password });
+            {
+                try
+                {
+                    _Client.BeginInitialize(InitializeCallback, new string[] { userUri, password });
+                }
+                catch (AlreadyInitializedException)
+                {
+                    BeginSignIn(userUri, password);
+                }
+                catch (Exception ex)
+                {
+                    NotificationHelper.Notify(Notifier, "Lync Client", "Lync client sign in error: " + ex.Message, Severity.Error);
+                }
+            }
             else
                 BeginSignIn(userUri, password);
         }
@@ -69,6 +101,8 @@ namespace Lync
         {
             if (!ar.IsCompleted)
                 return;
+
+            _Client.EndInitialize(ar);
 
             string[] login = ar.AsyncState as string[];
             BeginSignIn(login[0], login[1]);
@@ -82,13 +116,23 @@ namespace Lync
                 return;
             }
 
-            _Client.BeginSignIn(userUri, string.Empty, password, SignInCallback, null);
+            try
+            {
+                _Client.BeginSignIn(userUri, string.Empty, password, SignInCallback, null);
+            }
+            catch (Exception ex)
+            {
+                NotificationHelper.Notify(Notifier, "Lync Client", "Lync client sign in error: " + ex.Message, Severity.Error);
+            }
         }
 
         private void SignInCallback(IAsyncResult ar)
         {
-            if (ar.IsCompleted)
-                OnSignIn();
+            if (!ar.IsCompleted)
+                return;
+
+            _Client.EndSignIn(ar);
+            OnSignIn();
         }
 
         protected void OnSignIn()
@@ -112,11 +156,13 @@ namespace Lync
             if (!ar.IsCompleted)
                 return;
 
+            _Client.EndSignOut(ar);
+
             if (_Self != null)
                 lock (_SelfLock) { _Self = null; }
 
             if (_Client.InSuppressedMode)
-                _Client.BeginShutdown(null, null);
+                _Client.BeginShutdown((ar2) => { _Client.EndShutdown(ar2); }, null);
 
             this._Self = null;
             this._Client = null;
